@@ -50,14 +50,44 @@ def record_contribution(member_id, amount):
 
 def list_contributions(member_id):
     """Return all contributions of one member, newest first."""
-    # TODO
-    raise NotImplementedError
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            """
+            SELECT contribution_id, member_id, amount, contribution_date
+            FROM contributions
+            WHERE member_id = ?
+            ORDER BY contribution_date DESC, contribution_id DESC
+            """,
+            (member_id,),
+        ).fetchall()
+
+        return [
+            {
+                "contribution_id": row["contribution_id"],
+                "member_id": row["member_id"],
+                "amount": row["amount"],
+                "contribution_date": row["contribution_date"],
+            }
+            for row in rows
+        ]
+    finally:
+        conn.close()
 
 
 def member_savings(member_id):
     """Return the total contributed by one member (0 if none)."""
-    # TODO
-    raise NotImplementedError
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT COALESCE(SUM(amount), 0) AS total FROM contributions WHERE member_id = ?",
+            (member_id,),
+        ).fetchone()
+        if row is None:
+            return 0
+        return row["total"]
+    finally:
+        conn.close()
 
 
 def record_fine(member_id, reason, amount):
