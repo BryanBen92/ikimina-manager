@@ -58,3 +58,18 @@ def create_tables():
                 fine_date TEXT NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value REAL NOT NULL
+            )
+        """)
+
+
+def get_setting(key):
+    conn = get_connection()
+    row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    conn.close()
+    if row is None:
+        return None
+    return row["value"]
