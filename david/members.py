@@ -26,8 +26,8 @@ def add_member(full_name, phone):
         raise ValueError("Full name is required")
 
     joined_date = date.today().isoformat()
-
     conn = get_connection()
+
     try:
         cursor = conn.execute(
             """
@@ -45,6 +45,7 @@ def add_member(full_name, phone):
 def get_member(member_id):
     """Return a Member by ID, or None if not found."""
     conn = get_connection()
+
     try:
         row = conn.execute(
             """
@@ -64,5 +65,59 @@ def get_member(member_id):
             row["phone"],
             row["date_joined"],
         )
+    finally:
+        conn.close()
+
+
+def list_members():
+    """Return all members as Member objects."""
+    conn = get_connection()
+
+    try:
+        rows = conn.execute(
+            """
+            SELECT member_id, full_name, phone, date_joined
+            FROM members
+            ORDER BY member_id
+            """
+        ).fetchall()
+
+        return [
+            Member(
+                row["member_id"],
+                row["full_name"],
+                row["phone"],
+                row["date_joined"],
+            )
+            for row in rows
+        ]
+    finally:
+        conn.close()
+
+
+def search_members(text):
+    """Return members whose names contain the search text."""
+    conn = get_connection()
+
+    try:
+        rows = conn.execute(
+            """
+            SELECT member_id, full_name, phone, date_joined
+            FROM members
+            WHERE LOWER(full_name) LIKE LOWER(?)
+            ORDER BY member_id
+            """,
+            (f"%{text}%",),
+        ).fetchall()
+
+        return [
+            Member(
+                row["member_id"],
+                row["full_name"],
+                row["phone"],
+                row["date_joined"],
+            )
+            for row in rows
+        ]
     finally:
         conn.close()
