@@ -1,11 +1,4 @@
-"""Loans and repayments module for Ikimina Manager.
-
-This module handles:
-- Calculating maximum loan limits based on member savings
-- Issuing new loans with interest calculations
-- Recording repayments and updating loan status
-- Listing active and overdue loans
-"""
+"""Loans and repayments module for Ikimina Manager."""
 
 from datetime import date, timedelta
 
@@ -49,7 +42,7 @@ def max_loan_allowed(member_id):
     # Get outstanding balance from active loans
     conn = get_connection()
     query = """
-        SELECT SUM(total_due - amount_paid) as outstanding_balance
+        SELECT COALESCE(SUM(total_due - amount_paid), 0) as outstanding_balance
         FROM loans
         WHERE member_id = ? AND status = 'active'
     """
@@ -57,7 +50,7 @@ def max_loan_allowed(member_id):
     conn.close()
 
     # Outstanding balance is 0 if no active loans exist
-    outstanding_balance = result["outstanding_balance"] if result else 0.0
+    outstanding_balance = float(result["outstanding_balance"]) if result else 0.0
 
     # Calculate remaining amount available to borrow
     remaining = max_loan - outstanding_balance
@@ -131,7 +124,7 @@ def issue_loan(member_id, amount):
     conn = get_connection()
     query = """
         INSERT INTO loans (member_id, amount, interest, total_due, amount_paid, issue_date, due_date, status)
-        VALUES (?, ?, ?, ?, 0, ?, ?)
+        VALUES (?, ?, ?, ?, 0, ?, ?, ?)
     """
     today_str = today.isoformat()
 
@@ -383,4 +376,3 @@ def list_loans(member_id):
         })
 
     return loans
-
