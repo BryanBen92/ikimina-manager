@@ -45,7 +45,7 @@ def member_statement(member_id):
     return {
         "savings": savings,
         "loans_taken": loans_taken,
-        "amount_owed": loans_taken - repaid,
+        "amount_owed": max(loans_taken - repaid, 0),
         "fines_total": fines_total,
     }
 
@@ -102,7 +102,7 @@ def group_summary():
         "num_members": num_members,
         "total_savings": total_savings,
         "money_lent": money_lent,
-        "amount_owed": money_lent - repaid,
+        "amount_owed": max(money_lent - repaid, 0),
         "num_overdue": num_overdue,
         "total_fines": total_fines,
     }
