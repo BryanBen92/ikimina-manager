@@ -2,8 +2,8 @@
 
 from datetime import date, timedelta
 
-from db import get_connection, get_setting
-from benjamin_mugisha.contributions import member_savings
+from database.db import get_connection, get_setting
+from contributions.contributions import member_savings
 
 
 def max_loan_allowed(member_id):

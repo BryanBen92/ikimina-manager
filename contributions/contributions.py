@@ -4,7 +4,7 @@ Owner: Benjamin Mugisha Ntege
 
 from datetime import date
 
-from db import get_connection
+from database.db import get_connection
 
 
 def _member_exists(conn, member_id):

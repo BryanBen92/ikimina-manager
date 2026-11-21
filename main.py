@@ -1,13 +1,13 @@
 """Ikimina Manager: entry point and menus.
 Owner: Benjamin Bryan Inema
 """
-from db import create_tables
+from database.db import create_tables
 
-from members import add_member, list_members, search_members, update_member, delete_member
-from benjamin_mugisha.contributions import record_contribution, record_fine
-from calvin.loans import max_loan_allowed, issue_loan, record_repayment, list_overdue_loans
-from prosper.reports import print_member_statement, print_group_summary
-from prosper.validators import get_int, get_amount, get_text
+from members.members import add_member, list_members, search_members, update_member, delete_member
+from contributions.contributions import record_contribution, record_fine
+from loans.loans import max_loan_allowed, issue_loan, record_repayment, list_overdue_loans
+from reports.reports import print_member_statement, print_group_summary
+from utils.validators import get_int, get_amount, get_text
 
 TREASURER_PIN = "1234"
 
@@ -86,7 +86,7 @@ def treasurer_menu():
             elif choice == 2:
                 mid = get_int("Member ID: ")
                 amount = get_amount("Amount: ")
-                from benjamin_mugisha.contributions import record_contribution
+                from contributions.contributions import record_contribution
                 total = record_contribution(mid, amount)
                 print(f"Contribution recorded. New total savings: {total}")
             elif choice == 3:

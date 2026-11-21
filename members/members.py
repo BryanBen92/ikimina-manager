@@ -1,5 +1,5 @@
 from datetime import date
-from db import get_connection
+from database.db import get_connection
 
 
 class Member:

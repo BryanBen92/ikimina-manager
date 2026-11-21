@@ -2,11 +2,11 @@
 Owner: Prosper Shimwa
 """
 
-from db import get_connection
+from database.db import get_connection
 
-from members import get_member, list_members
-from benjamin_mugisha.contributions import member_savings, list_fines
-from calvin.loans import list_loans, list_overdue_loans
+from members.members import get_member, list_members
+from contributions.contributions import member_savings, list_fines
+from loans.loans import list_loans, list_overdue_loans
 
 
 def _scalar(conn, sql, params=()):
