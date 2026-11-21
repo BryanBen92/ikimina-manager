@@ -47,12 +47,23 @@ def treasurer_menu():
             print(f"Error: {exc}")
 
 
+def member_menu():
+    """Ask for a member ID and print that member's statement (read only)."""
+    mid = get_int("Member ID: ")
+    try:
+        print_member_statement(mid)
+    except Exception as exc:
+        print(f"Error: {exc}")
+
+
 def main():
     create_tables()
     while True:
         choice = show_role_menu()
         if choice == 1:
             treasurer_menu()
+        elif choice == 2:
+            member_menu()
         elif choice == 0:
             print("Goodbye.")
             break
