@@ -118,6 +118,56 @@ def search_members(text):
                 row["date_joined"],
             )
             for row in rows
+
+
+
+
+
+
+
+
         ]
+    finally:
+        conn.close()
+        
+                        
+def update_member(member_id, full_name, phone):
+    """Update a member's name and phone number."""
+    if not full_name or not full_name.strip():
+        raise ValueError("Full name is required")
+
+    conn = get_connection()
+
+    try:
+        cursor = conn.execute(
+            """
+            UPDATE members
+            SET full_name = ?, phone = ?
+            WHERE member_id = ?
+            """,
+            (full_name.strip(), phone, member_id),
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+
+def delete_member(member_id):
+    """Delete a member, handling foreign key constraints."""
+    import sqlite3
+
+    conn = get_connection()
+
+    try:
+        conn.execute(
+            "DELETE FROM members WHERE member_id = ?",
+            (member_id,),
+        )
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        return False
     finally:
         conn.close()
