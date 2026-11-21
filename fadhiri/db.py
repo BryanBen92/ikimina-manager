@@ -2,6 +2,12 @@ import sqlite3
 
 DB_FILE = "ikimina.db"
 
+DEFAULT_SETTINGS = {
+    "loan_limit_multiplier": 3,
+    "interest_rate_percent": 5,
+    "loan_days": 30,
+}
+
 
 def get_connection():
     conn = sqlite3.connect(DB_FILE)
@@ -64,6 +70,8 @@ def create_tables():
                 value REAL NOT NULL
             )
         """)
+        for key, value in DEFAULT_SETTINGS.items():
+            conn.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, value))
 
 
 def get_setting(key):
