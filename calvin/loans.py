@@ -32,6 +32,37 @@ def max_loan_allowed(member_id):
         ValueError: If loan_limit_multiplier setting is not configured.
         sqlite3.Error: If database operation fails.
     """
+    # Get the loan limit multiplier from settings
+    loan_limit_multiplier = get_setting("loan_limit_multiplier")
+    if loan_limit_multiplier is None:
+        raise ValueError(
+            "Loan limit multiplier is not configured. "
+            "Please consult the treasurer to set this value."
+        )
+
+    # Get member's total savings from contributions
+    total_savings = member_savings(member_id)
+
+    # Calculate maximum loan based on savings and multiplier
+    max_loan = total_savings * loan_limit_multiplier
+
+    # Get outstanding balance from active loans
+    conn = get_connection()
+    query = """
+        SELECT SUM(total_due - amount_paid) as outstanding_balance
+        FROM loans
+        WHERE member_id = ? AND status = 'active'
+    """
+    result = conn.execute(query, (member_id,)).fetchone()
+    conn.close()
+
+    # Outstanding balance is 0 if no active loans exist
+    outstanding_balance = result["outstanding_balance"] if result else 0.0
+
+    # Calculate remaining amount available to borrow
+    remaining = max_loan - outstanding_balance
+
+    return float(remaining)
 
 
 def issue_loan(member_id, amount):
@@ -129,34 +160,101 @@ def issue_loan(member_id, amount):
         raise RuntimeError(f"Failed to create loan: {e}")
     finally:
         conn.close()
-    # Get the loan limit multiplier from settings
-    loan_limit_multiplier = get_setting("loan_limit_multiplier")
-    if loan_limit_multiplier is None:
+
+
+def record_repayment(loan_id, amount):
+    """
+    Record a repayment for an existing active loan.
+
+    This function validates the loan exists and is active, checks that
+    the repayment amount doesn't exceed the outstanding balance, then
+    saves the repayment and updates the loan's amount_paid. If the loan
+    becomes fully paid, its status is updated to 'repaid'.
+
+    Args:
+        loan_id: The ID of the loan being repaid.
+        amount: The repayment amount (must be positive).
+
+    Returns:
+        float: The remaining balance on the loan after this repayment.
+
+    Raises:
+        ValueError: If repayment amount is not positive or exceeds outstanding.
+        sqlite3.Error: If database operation fails.
+    """
+    # Verify repayment amount is positive
+    if amount <= 0:
         raise ValueError(
-            "Loan limit multiplier is not configured. "
-            "Please consult the treasurer to set this value."
+            f"Repayment amount must be positive, got {amount}. "
+            "Please provide a valid positive repayment amount."
         )
 
-    # Get member's total savings from contributions
-    total_savings = member_savings(member_id)
-
-    # Calculate maximum loan based on savings and multiplier
-    max_loan = total_savings * loan_limit_multiplier
-
-    # Get outstanding balance from active loans
+    # Retrieve the loan from database
     conn = get_connection()
     query = """
-        SELECT SUM(total_due - amount_paid) as outstanding_balance
+        SELECT loan_id, member_id, total_due, amount_paid, status
         FROM loans
-        WHERE member_id = ? AND status = 'active'
+        WHERE loan_id = ?
     """
-    result = conn.execute(query, (member_id,)).fetchone()
-    conn.close()
+    result = conn.execute(query, (loan_id,)).fetchone()
 
-    # Outstanding balance is 0 if no active loans exist
-    outstanding_balance = result["outstanding_balance"] if result else 0.0
+    if result is None:
+        raise ValueError(
+            f"Loan ID {loan_id} not found. Please verify the loan exists."
+        )
 
-    # Calculate remaining amount available to borrow
-    remaining = max_loan - outstanding_balance
+    loan_id_db, member_id, total_due, amount_paid, status = result
 
-    return float(remaining)
+    # Check that loan is still active (not already repaid)
+    if status == "repaid":
+        raise ValueError(
+            f"Loan ID {loan_id} has already been fully repaid. "
+            "No further repayments can be recorded."
+        )
+
+    # Calculate outstanding balance before repayment
+    remaining_balance = total_due - amount_paid
+
+    # Check if repayment exceeds outstanding balance
+    if amount > remaining_balance:
+        raise ValueError(
+            f"Repayment amount of {amount} exceeds outstanding balance "
+            f"of {remaining_balance:.2f}. "
+            f"The loan has {remaining_balance:.2f} remaining."
+        )
+
+    # Save repayment and update loan amount_paid in a transaction
+    try:
+        # Record the repayment
+        conn.execute(
+            """
+                INSERT INTO repayments (loan_id, amount, repayment_date)
+                VALUES (?, ?, ?)
+            """,
+            (loan_id, amount, date.today().isoformat())
+        )
+
+        # Update the loan's amount_paid
+        new_amount_paid = amount_paid + amount
+        conn.execute(
+            "UPDATE loans SET amount_paid = ? WHERE loan_id = ?",
+            (new_amount_paid, loan_id)
+        )
+
+        # If fully paid, update status to repaid
+        if new_amount_paid >= total_due:
+            conn.execute(
+                "UPDATE loans SET status = 'repaid' WHERE loan_id = ?",
+                (loan_id,)
+            )
+
+        # Save all changes
+        conn.commit()
+
+        return float(remaining_balance - amount)
+
+    except Exception as e:
+        conn.rollback()
+        raise RuntimeError(f"Failed to record repayment: {e}")
+    finally:
+        conn.close()
