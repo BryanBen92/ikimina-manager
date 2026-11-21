@@ -12,8 +12,11 @@ def record_contribution(member_id, amount):
 
     Raise ValueError if the amount is not positive or the member does not exist.
     """
-    if amount is None or amount <= 0:
-        raise ValueError("Contribution amount must be positive.")
+    try:
+        if amount is None or amount <= 0:
+            raise ValueError("Contribution amount must be positive.")
+    except TypeError as exc:
+        raise ValueError("Contribution amount must be positive.") from exc
 
     conn = get_connection()
     try:
@@ -92,8 +95,11 @@ def member_savings(member_id):
 
 def record_fine(member_id, reason, amount):
     """Save a fine dated today, raising ValueError for a bad amount or unknown member."""
-    if amount is None or amount <= 0:
-        raise ValueError("Fine amount must be positive.")
+    try:
+        if amount is None or amount <= 0:
+            raise ValueError("Fine amount must be positive.")
+    except TypeError as exc:
+        raise ValueError("Fine amount must be positive.") from exc
 
     conn = get_connection()
     try:
