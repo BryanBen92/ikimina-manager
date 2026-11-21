@@ -1,10 +1,12 @@
 """Statements and the group summary.
 Owner: Prosper Shimwa
-
-Called from main.py (Bryan) through print_member_statement and
-print_group_summary. Data comes from the tables created in fadhiri/db.py.
 """
-from fadhiri.db import get_connection
+
+from db import get_connection
+
+from members import get_member, list_members
+from benjamin_mugisha.contributions import member_savings, list_fines
+from calvin.loans import list_loans, list_overdue_loans
 
 
 def _scalar(conn, sql, params=()):
@@ -15,6 +17,10 @@ def _scalar(conn, sql, params=()):
 
 def member_statement(member_id):
     """Return a dict: savings, loans taken, amount still owed, fines total."""
+    member = get_member(member_id)
+    if member is None:
+        raise ValueError("Member does not exist.")
+
     conn = get_connection()
     try:
         savings = _scalar(
@@ -30,7 +36,7 @@ def member_statement(member_id):
         repaid = _scalar(
             conn,
             """SELECT COALESCE(SUM(r.amount), 0)
-               FROM repayments r JOIN loans l ON r.loan_id = l.id
+               FROM repayments r JOIN loans l ON r.loan_id = l.loan_id
                WHERE l.member_id = ?""",
             (member_id,),
         )
@@ -42,67 +48,80 @@ def member_statement(member_id):
     finally:
         conn.close()
 
+    loans = list_loans(member_id)
+    amount_owed = sum(
+        float(loan["total_due"]) - float(loan["amount_paid"])
+        for loan in loans
+        if loan["status"] == "active"
+    )
+    if not amount_owed:
+        amount_owed = loans_taken - repaid
+
     return {
+        "member_id": member_id,
+        "full_name": member.full_name,
         "savings": savings,
         "loans_taken": loans_taken,
-        "amount_owed": max(loans_taken - repaid, 0),
+        "amount_owed": amount_owed,
         "fines_total": fines_total,
     }
 
 
 def print_member_statement(member_id):
     """Print the statement as a neat block of text."""
-    conn = get_connection()
-    try:
-        row = conn.execute(
-            "SELECT name FROM members WHERE id = ?", (member_id,)
-        ).fetchone()
-    finally:
-        conn.close()
+    statement = member_statement(member_id)
+    loans = list_loans(member_id)
+    fines = list_fines(member_id)
 
-    if row is None:
-        print(f"No member found with ID {member_id}.")
-        return
+    print("\n===== MEMBER STATEMENT =====")
+    print(f"Member ID:   {statement['member_id']}")
+    print(f"Name:        {statement['full_name']}")
+    print(f"Savings:     {statement['savings']}")
+    print(f"Loans taken: {statement['loans_taken']}")
+    print(f"Amount owed: {statement['amount_owed']}")
+    print(f"Fines total: {statement['fines_total']}")
 
-    s = member_statement(member_id)
-    print("=" * 36)
-    print(f" MEMBER STATEMENT: {row[0]} (ID {member_id})")
-    print("=" * 36)
-    print(f" Total savings      : {s['savings']:>12,.0f}")
-    print(f" Loans taken        : {s['loans_taken']:>12,.0f}")
-    print(f" Amount still owed  : {s['amount_owed']:>12,.0f}")
-    print(f" Fines total        : {s['fines_total']:>12,.0f}")
-    print("=" * 36)
+    if loans:
+        print("\nLoans:")
+        for loan in loans:
+            print(
+                f"  Loan {loan['loan_id']}: principal {loan['amount']}, "
+                f"total due {loan['total_due']}, paid {loan['amount_paid']}, "
+                f"due {loan['due_date']}, status {loan['status']}"
+            )
+
+    if fines:
+        print("\nFines:")
+        for fine in fines:
+            print(f"  Fine {fine['fine_id']}: {fine['reason']} - {fine['amount']} ({fine['fine_date']})")
+    print("===========================\n")
 
 
 def group_summary():
     """Return a dict: number of members, total savings, money lent out,
     amount still owed, number of overdue loans, total fines."""
+    members = list_members()
+    num_members = len(members)
+    total_savings = sum(member_savings(m.member_id) for m in members)
+
     conn = get_connection()
     try:
-        num_members = _scalar(conn, "SELECT COUNT(*) FROM members")
-        total_savings = _scalar(
-            conn, "SELECT COALESCE(SUM(amount), 0) FROM contributions"
-        )
         money_lent = _scalar(conn, "SELECT COALESCE(SUM(amount), 0) FROM loans")
-        repaid = _scalar(conn, "SELECT COALESCE(SUM(amount), 0) FROM repayments")
-        total_fines = _scalar(conn, "SELECT COALESCE(SUM(amount), 0) FROM fines")
-        # A loan is overdue when its due date has passed and it is not fully repaid.
-        num_overdue = _scalar(
+        amount_owed = _scalar(
             conn,
-            """SELECT COUNT(*) FROM loans l
-               WHERE l.due_date < date('now')
-                 AND l.amount > (SELECT COALESCE(SUM(r.amount), 0)
-                                 FROM repayments r WHERE r.loan_id = l.id)""",
+            "SELECT COALESCE(SUM(total_due - amount_paid), 0) FROM loans WHERE status = 'active'",
         )
+        total_fines = _scalar(conn, "SELECT COALESCE(SUM(amount), 0) FROM fines")
     finally:
         conn.close()
+
+    num_overdue = len(list_overdue_loans())
 
     return {
         "num_members": num_members,
         "total_savings": total_savings,
         "money_lent": money_lent,
-        "amount_owed": max(money_lent - repaid, 0),
+        "amount_owed": amount_owed,
         "num_overdue": num_overdue,
         "total_fines": total_fines,
     }
@@ -110,14 +129,12 @@ def group_summary():
 
 def print_group_summary():
     """Print the summary as a neat block of text."""
-    g = group_summary()
-    print("=" * 36)
-    print(" GROUP SUMMARY")
-    print("=" * 36)
-    print(f" Number of members  : {g['num_members']:>12}")
-    print(f" Total savings      : {g['total_savings']:>12,.0f}")
-    print(f" Money lent out     : {g['money_lent']:>12,.0f}")
-    print(f" Amount still owed  : {g['amount_owed']:>12,.0f}")
-    print(f" Overdue loans      : {g['num_overdue']:>12}")
-    print(f" Total fines        : {g['total_fines']:>12,.0f}")
-    print("=" * 36)
+    summary = group_summary()
+    print("\n===== GROUP SUMMARY =====")
+    print(f"Number of members:    {summary['num_members']}")
+    print(f"Total savings:        {summary['total_savings']}")
+    print(f"Money lent out:       {summary['money_lent']}")
+    print(f"Amount still owed:    {summary['amount_owed']}")
+    print(f"Number of overdue:    {summary['num_overdue']}")
+    print(f"Total fines:          {summary['total_fines']}")
+    print("========================\n")
