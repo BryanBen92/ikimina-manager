@@ -258,3 +258,64 @@ def record_repayment(loan_id, amount):
         raise RuntimeError(f"Failed to record repayment: {e}")
     finally:
         conn.close()
+
+
+def list_overdue_loans():
+    """
+    Retrieve all active loans that are past their due date.
+
+    This function identifies loans whose due_date is earlier than today's
+    date and status is still 'active' (not fully repaid). These are
+    considered overdue and may need attention.
+
+    Returns:
+        list: A list of dictionaries containing overdue loan information.
+               Each dictionary contains:
+               - loan_id: The loan's primary key
+               - member_id: The member who received the loan
+               - amount: The principal loan amount
+               - interest: The calculated interest
+               - total_due: Total amount due including interest
+               - amount_paid: Amount already paid
+               - issue_date: When the loan was issued
+               - due_date: When repayment is due
+               - status: Current loan status
+
+    Example:
+        >>> overdue = list_overdue_loans()
+        >>> for loan in overdue:
+        ...     print(f"Loan {loan['loan_id']} to member {loan['member_id']} "
+        ...           f"is overdue by {(date.today() > loan['due_date'])}")
+    """
+    # Get today's date as ISO string for comparison
+    today_str = date.today().isoformat()
+
+    conn = get_connection()
+    query = """
+        SELECT loan_id, member_id, amount, interest, total_due, 
+               amount_paid, issue_date, due_date, status
+        FROM loans
+        WHERE status = 'active' AND due_date < ?
+        ORDER BY due_date ASC
+    """
+
+    cursor = conn.execute(query, (today_str,))
+    results = cursor.fetchall()
+    conn.close()
+
+    # Convert rows to dictionaries for easier use
+    loans = []
+    for row in results:
+        loans.append({
+            "loan_id": row["loan_id"],
+            "member_id": row["member_id"],
+            "amount": float(row["amount"]),
+            "interest": float(row["interest"]),
+            "total_due": float(row["total_due"]),
+            "amount_paid": float(row["amount_paid"]),
+            "issue_date": row["issue_date"],
+            "due_date": row["due_date"],
+            "status": row["status"]
+        })
+
+    return loans
