@@ -9,7 +9,7 @@ This module handles:
 
 from datetime import date, timedelta
 
-from fadhiri.db import get_connection, get_setting
+from db import get_connection, get_setting
 from benjamin_mugisha.contributions import member_savings
 
 

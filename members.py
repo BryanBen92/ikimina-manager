@@ -1,5 +1,5 @@
 from datetime import date
-from fadhiri.db import get_connection
+from db import get_connection
 
 
 class Member:
