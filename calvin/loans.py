@@ -319,3 +319,68 @@ def list_overdue_loans():
         })
 
     return loans
+
+
+def list_loans(member_id):
+    """
+    Retrieve all loans belonging to a specific member.
+
+    This function returns all loan records for the specified member,
+    regardless of their status (active, repaid, or any other). The results
+    are returned in a dictionary format for easy access to individual fields.
+
+    Args:
+        member_id: The ID of the member whose loans to retrieve.
+
+    Returns:
+        list: A list of dictionaries containing loan information.
+               Each dictionary contains:
+               - loan_id: The loan's primary key
+               - member_id: The member who received the loan
+               - amount: The principal loan amount
+               - interest: The calculated interest
+               - total_due: Total amount due including interest
+               - amount_paid: Amount already paid
+               - issue_date: When the loan was issued (ISO string)
+               - due_date: When repayment is due (ISO string)
+               - status: Current loan status ('active' or 'repaid')
+
+    Example:
+        >>> loans = list_loans(1)
+        >>> for loan in loans:
+        ...     print(f"Loan ID {loan['loan_id']}: ${loan['amount']} "
+        ...           f"(Due: {loan['due_date']}, Paid: {loan['amount_paid']})")
+
+    Note:
+        Returns an empty list if the member has no loans.
+    """
+    conn = get_connection()
+    query = """
+        SELECT loan_id, member_id, amount, interest, total_due, 
+               amount_paid, issue_date, due_date, status
+        FROM loans
+        WHERE member_id = ?
+        ORDER BY issue_date DESC
+    """
+
+    cursor = conn.execute(query, (member_id,))
+    results = cursor.fetchall()
+    conn.close()
+
+    # Convert rows to dictionaries for easier use
+    loans = []
+    for row in results:
+        loans.append({
+            "loan_id": row["loan_id"],
+            "member_id": row["member_id"],
+            "amount": float(row["amount"]),
+            "interest": float(row["interest"]),
+            "total_due": float(row["total_due"]),
+            "amount_paid": float(row["amount_paid"]),
+            "issue_date": row["issue_date"],
+            "due_date": row["due_date"],
+            "status": row["status"]
+        })
+
+    return loans
+
