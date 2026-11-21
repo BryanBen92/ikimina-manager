@@ -92,11 +92,57 @@ def member_savings(member_id):
 
 def record_fine(member_id, reason, amount):
     """Save a fine dated today, raising ValueError for a bad amount or unknown member."""
-    # TODO
-    raise NotImplementedError
+    if amount is None or amount <= 0:
+        raise ValueError("Fine amount must be positive.")
+
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT member_id FROM members WHERE member_id = ?",
+            (member_id,),
+        ).fetchone()
+        if row is None:
+            raise ValueError("Member does not exist.")
+
+        today = date.today().isoformat()
+        conn.execute(
+            """
+            INSERT INTO fines (member_id, reason, amount, fine_date)
+            VALUES (?, ?, ?, ?)
+            """,
+            (member_id, reason, amount, today),
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def list_fines(member_id):
     """Return all fines of one member."""
-    # TODO
-    raise NotImplementedError
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            """
+            SELECT fine_id, member_id, reason, amount, fine_date
+            FROM fines
+            WHERE member_id = ?
+            ORDER BY fine_id ASC
+            """,
+            (member_id,),
+        ).fetchall()
+
+        return [
+            {
+                "fine_id": row["fine_id"],
+                "member_id": row["member_id"],
+                "reason": row["reason"],
+                "amount": row["amount"],
+                "fine_date": row["fine_date"],
+            }
+            for row in rows
+        ]
+    finally:
+        conn.close()
