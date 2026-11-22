@@ -54,8 +54,6 @@ def member_statement(member_id):
         for loan in loans
         if loan["status"] == "active"
     )
-    if not amount_owed:
-        amount_owed = loans_taken - repaid
 
     return {
         "member_id": member_id,
