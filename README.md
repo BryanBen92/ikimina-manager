@@ -50,6 +50,3 @@ git pull --rebase && git push
 ```
 Commit small and often, with messages that say what you did. Every member needs more than 4 commits on main.
 
-## For the QA session
-You will be asked to find and explain your own code. Be able to say what each of your
-functions does, which SQL it runs, and who calls it.
